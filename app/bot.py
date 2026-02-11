@@ -1,15 +1,20 @@
 import asyncio
-import httpx
+#import httpx
+import os
+from dotenv import load_dotenv
 from telegram import Update
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
     ContextTypes,
 )
+from scripts.rag_ask import ask_with_rag
+load_dotenv()
 
-BOT_TOKEN =  "8039706333:AAEGbRSIN9ry3Jgy2SluPQe38uUErUzj2Os"
-OLLAMA_URL = "http://127.0.0.1:11434/api/generate"
-MODEL = "gemma3:12b"
+
+BOT_TOKEN =  os.getenv("BOT_TOKEN")
+#OLLAMA_URL = "http://127.0.0.1:11434/api/generate"
+#MODEL = "gemma3:12b"
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -19,29 +24,20 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def gemma(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    prompt = " ".join(context.args)
-    if not prompt:
+    question = " ".join(context.args)
+    if not question:
         await update.message.reply_text("Напиши вопрос после /gemma")
         return
 
     await update.message.reply_text("🤔 Думаю...")
 
-    payload = {
-        "model": MODEL,
-        "prompt": prompt,
-        "stream": False,
-    }
-
     try:
-        async with httpx.AsyncClient(timeout=120) as client:
-            response = await client.post(OLLAMA_URL, json=payload)
-            response.raise_for_status()
-            answer = response.json()["response"]
-
+        answer = ask_with_rag(question)
         await update.message.reply_text(answer)
 
     except Exception as e:
         await update.message.reply_text(f"Ошибка: {e}")
+
 
 
 def main():

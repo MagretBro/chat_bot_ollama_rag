@@ -1,6 +1,22 @@
+# виртуальное окружение
 .venv/
+venv/
+
+# Python
 __pycache__/
+*.pyc
+
+# env / secrets
 .env
+
+# данные
+data/*.json
+
+# IDE
+.vscode/
+.idea/
+
+
 *.sqlite3
 *.db
 app/token.txt
