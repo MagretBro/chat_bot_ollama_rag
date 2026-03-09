@@ -1,36 +1,35 @@
 import json
 import subprocess
+from chromadb import Client
+from chromadb.config import Settings
 
-DATA_FILE = "data/rag_documents_analysts_hunter.json"
-MODEL = "gemma3:12b"
-MAX_DOCS = 5  # ограничиваем контекст
+VECTOR_DIR = "vectorstore"
+COLLECTION_NAME = "telegram_posts"
 
+# подключаем ChromaDB
+client = Client(Settings(persist_directory=VECTOR_DIR, is_persistent=True, anonymized_telemetry=False))
+collection = client.get_or_create_collection(name=COLLECTION_NAME)
 
-def load_documents():
-    with open(DATA_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+def search_docs(query, k=3):
+    """Ищем похожие документы в ChromaDB"""
+    results = collection.query(query_texts=[query], n_results=k)
+    docs = results['documents'][0]
+    return docs
 
-
-def build_context(docs):
-    texts = []
-    for d in docs[:MAX_DOCS]:
-        texts.append(f"- {d['text']}")
-    return "\n".join(texts)
-
-
-def ask_ollama(prompt):
+def ask_ollama(prompt, model="gemma3:12b"):
+    """Отправляем промпт в Ollama локально"""
     result = subprocess.run(
-        ["ollama", "run", MODEL],
+        ["ollama", "run", model],
         input=prompt,
         text=True,
         capture_output=True
     )
-    return result.stdout
+    return result.stdout.strip()
 
-# ✅ ОСНОВНАЯ RAG-ФУНКЦИЯ (её будет вызывать Telegram-бот)
-def ask_with_rag(question: str) -> str:
-    docs = load_documents()
-    context = build_context(docs)
+def ask_with_rag(question):
+    # получаем k похожих документов
+    docs = search_docs(question)
+    context = "\n".join(f"- {d}" for d in docs)
 
     prompt = f"""
 Ты аналитик рынка труда. Отвечай кратко, 2-3 предложения.
@@ -44,12 +43,12 @@ def ask_with_rag(question: str) -> str:
 Ответь кратко и по делу.
 """
     answer = ask_ollama(prompt)
-    return answer[:3500]
+    return answer
 
-
-# ✅ локальный тест из терминала
 if __name__ == "__main__":
-    question = input("Вопрос: ")
-    answer = ask_with_rag(question)
-    print("\nОТВЕТ:\n")
-    print(answer)
+    while True:
+        query = input("Вопрос: ")
+        if query.lower() in ("exit", "quit"):
+            break
+        answer = ask_with_rag(query)
+        print("\nОтвет:", answer, "\n")
