@@ -1,120 +1,220 @@
-
-# Telegram RAG Bot (Gemma + Ollama)
+# Telegram RAG Bot (Gemma + Ollama + ChromaDB)
 
 ![Telegram](https://img.shields.io/badge/Platform-Telegram-blue)
-![Python](https://img.shields.io/badge/Python-3.11-green)
+![Python](https://img.shields.io/badge/Python-3.12-green)
 ![Status](https://img.shields.io/badge/Status-Working-brightgreen)
 
 ## Описание проекта
-Это **локальный Telegram-бот**, который использует **RAG (Retrieval-Augmented Generation)** с моделью **Gemma3:12b** через **Ollama** для ответов на вопросы по контексту.  
 
-Проект позволяет:
-- Получать ответы на вопросы, учитывая контекст из заранее выгруженных данных (JSON с сообщениями из Telegram-каналов).  
-- Работать полностью **локально** (без отправки данных в облако).  
-- Быстро тестировать идеи с RAG и интегрировать в Telegram.  
+Это **локальный Telegram-бот**, использующий **RAG (Retrieval-Augmented Generation)** для поиска информации в сообщениях Telegram-каналов.
 
----
+Бот:
 
-## Основные возможности
-- Подключение локальной модели **Gemma3:12b** через Ollama.
-- Чтение контекста из JSON-файлов (`data/rag_documents_*.json`).
-- Короткие и конкретные ответы 2–3 предложения.
-- Локальная проверка через терминал или Telegram.
-- Возможность легко добавлять новые источники данных (Telegram, CSV, JSON).
+1️⃣ выгружает сообщения из Telegram
+2️⃣ сохраняет их в JSON
+3️⃣ индексирует сообщения в **векторной базе ChromaDB**
+4️⃣ выполняет **semantic search**
+5️⃣ передаёт найденный контекст в **Gemma3:12b (Ollama)**
+6️⃣ возвращает ответ пользователю
+
+Все вычисления выполняются **локально**.
 
 ---
 
-## Структура проекта
+# Архитектура
 
-```text
+```
+Telegram channels
+        ↓
+export_telegram.py
+        ↓
+JSON (data/raw)
+        ↓
+build_vectorstore.py
+        ↓
+ChromaDB (vectorstore)
+        ↓
+semantic search
+        ↓
+Gemma3:12b (Ollama)
+        ↓
+Telegram bot answer
+```
+
+---
+
+# Возможности
+
+* работа **полностью локально**
+* поиск по Telegram-каналам
+* **vector search (semantic search)**
+* интеграция с Telegram-ботом
+* использование **Gemma3:12b через Ollama**
+* возможность добавлять новые источники данных
+
+---
+
+# Структура проекта
+
+```
 telegram-rag-bot/
-├── .venv/                # Виртуальное окружение Python
-├── app/
-│   ├── bot.py            # Основной код Telegram-бота
-│   └── config.py         # Настройки (например, токен)
-├── data/
-│   └── rag_documents_*.json # Контекст для RAG
-├── scripts/
-│   ├── export_telegram.py # Скрипт выгрузки данных из Telegram
-│   └── rag_ask.py         # Локальная RAG-функция
-├── .gitignore
-├── requirements.txt
-└── README.md
-````
+
+app/
+   bot.py                 # Telegram бот
+   config.py              # настройки
+
+scripts/
+   export_telegram.py     # выгрузка сообщений из Telegram
+   build_vectorstore.py   # создание векторной базы
+   rag_ask.py             # локальный RAG запрос
+   debug_chroma.py        # диагностика базы
+
+data/
+   raw/
+      *.json              # выгруженные сообщения
+
+vectorstore/
+   chroma.sqlite3         # база ChromaDB
+
+requirements.txt
+README.md
+```
 
 ---
 
-## Установка и запуск
+# Установка
 
-1. Клонируем репозиторий:
+## 1. Клонировать проект
 
 ```bash
 git clone https://github.com/MagretBro/chat_bot_ollama_rag.git
 cd chat_bot_ollama_rag
 ```
 
-2. Создаём виртуальное окружение и активируем:
+---
+
+## 2. Создать виртуальное окружение
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate  # Linux / macOS
-.venv\Scripts\activate     # Windows
+source .venv/bin/activate
 ```
 
-3. Устанавливаем зависимости:
+Windows:
 
-```bash
+```
+.venv\Scripts\activate
+```
+
+---
+
+## 3. Установить зависимости
+
+```
 pip install -r requirements.txt
 ```
 
-4. Настраиваем `.env`:
+---
 
-```env
-BOT_TOKEN=ваш_токен_бота_от_Telegram
+# Запуск Ollama
+
+Установить Ollama:
+
+```
+https://ollama.com
 ```
 
-5. Запускаем локальный сервер Ollama:
+Запустить:
 
-```bash
+```
 ollama serve
 ```
 
-6. Запускаем Telegram-бот:
+Скачать модель:
 
-```bash
+```
+ollama pull gemma3:12b
+```
+
+---
+
+# Индексация данных
+
+После выгрузки сообщений из Telegram нужно построить векторную базу:
+
+```
+python scripts/build_vectorstore.py
+```
+
+---
+
+# Проверка RAG в терминале
+
+```
+python scripts/rag_ask.py
+```
+
+Пример:
+
+```
+Вопрос:
+кто ищет системного аналитика
+```
+
+---
+
+# Запуск Telegram бота
+
+```
+python -m app.bot
+```
+
+или
+
+```
 python app/bot.py
 ```
 
-7. В Telegram:
+---
+
+# Диагностика базы
+
+Посмотреть статистику базы:
 
 ```
-/start        # Приветственное сообщение
-/gemma <вопрос>  # Задать вопрос
+python scripts/debug_chroma.py
+```
+
+Вывод:
+
+```
+📊 документов в базе
+📡 источники
+🎲 случайные сообщения
 ```
 
 ---
 
-## Пример взаимодействия
+# Технологии
 
-**Вопрос:**
-`/gemma когда пропал "увольняка"?`
-
-**Ответ бота:**
-
-> Судя по тексту, увольняка пропал вчера. Контекст указывает на грусть по поводу его исчезновения. Вероятно, это повлияло на решение о поиске внешней причины для увольнения.
-
----
-
-## Технологии
-
-* **Python 3.11**
-* **Telegram Bot API** (`python-telegram-bot==20.6`)
-* **Ollama** (локальная модель Gemma3:12b)
-* **JSON** для хранения контекста
-* **RAG (Retrieval-Augmented Generation)**
+* Python 3.12
+* Ollama
+* Gemma3:12b
+* ChromaDB
+* python-telegram-bot
+* RAG (Retrieval-Augmented Generation)
 
 ---
 
+# Возможные улучшения
+
+* chunking сообщений
+* reranking результатов поиска
+* поддержка нескольких Telegram-каналов
+* автоматическое обновление базы
+* web-интерфейс
+
+---
 ## Контакты
 
 Автор: **MagretBro**
