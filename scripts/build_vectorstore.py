@@ -1,6 +1,7 @@
 import json
 import chromadb
 import os
+import re
 from chromadb.config import Settings
 
 DATA_DIR = "data/raw"
@@ -32,9 +33,11 @@ def main():
             continue
             
         doc_id = f"{d['id']}"
+
         if doc_id in existing:
             continue
-        texts.append(d["text"])
+            
+        texts.append(clean_text(text))
         metadatas.append({"date": d.get("date"), "source": "telegram"})
         ids.append(doc_id)
 
@@ -48,12 +51,18 @@ def is_useful(text):
     if len(text) < 80:
         return False
 
-    bad_words = ["😂", "🤣", "cookie", "фиолетовый"]
+    bad_words = ["😂", "🤣", ":)", ")))"]
 
     for w in bad_words:
-        return False
+        if w in text.lower():
+            return False
 
     return True
+
+def clean_text(text: str) -> str:
+    text = text.replace("\n", " ")
+    text = re.sub(r"\s+", " ", text)
+    return text.strip()
 
 if __name__ == "__main__":
     main()
