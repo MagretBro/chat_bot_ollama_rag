@@ -1,8 +1,9 @@
 import json
 import chromadb
+import os
 from chromadb.config import Settings
 
-DATA_FILE = "data/rag_documents_analysts_hunter.json"
+DATA_DIR = "data/raw"
 VECTOR_DIR = "vectorstore"
 COLLECTION_NAME = "telegram_posts"
 
@@ -14,36 +15,45 @@ def main():
             anonymized_telemetry=False,
         )
     )
+    collection = client.get_or_create_collection(name=COLLECTION_NAME)
+    existing = set(collection.get()["ids"])
 
-    collection = client.get_or_create_collection(
-        name=COLLECTION_NAME
-    )
+    docs = []
+    for file in os.listdir(DATA_DIR):
+        if file.endswith(".json"):
+            path = os.path.join(DATA_DIR, file)
+            with open(path, "r", encoding="utf-8") as f:
+                docs.extend(json.load(f))
 
-    with open(DATA_FILE, "r", encoding="utf-8") as f:
-        docs = json.load(f)
-
-    texts = []
-    metadatas = []
-    ids = []
-
-    for i, d in enumerate(docs):
-        if not d.get("text"):
+    texts, metadatas, ids = [], [], []
+    for d in docs:
+        text = d.get("text")
+        if not text or not is_useful(text):
+            continue
+            
+        doc_id = f"{d['id']}"
+        if doc_id in existing:
             continue
         texts.append(d["text"])
-        metadatas.append({
-            "date": d.get("date"),
-            "source": "telegram"
-        })
-        ids.append(str(i))
+        metadatas.append({"date": d.get("date"), "source": "telegram"})
+        ids.append(doc_id)
 
-    collection.add(
-        documents=texts,
-        metadatas=metadatas,
-        ids=ids
-    )
+    if texts:
+        collection.add(documents=texts, metadatas=metadatas, ids=ids)
+        print(f"✅ Загружено документов: {len(texts)}")
+    else:
+        print("ℹ️ Новых документов нет")
 
+def is_useful(text):
+    if len(text) < 80:
+        return False
 
-    print(f"✅ Загружено документов: {len(texts)}")
+    bad_words = ["😂", "🤣", "cookie", "фиолетовый"]
+
+    for w in bad_words:
+        return False
+
+    return True
 
 if __name__ == "__main__":
     main()

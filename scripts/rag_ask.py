@@ -10,10 +10,14 @@ COLLECTION_NAME = "telegram_posts"
 client = Client(Settings(persist_directory=VECTOR_DIR, is_persistent=True, anonymized_telemetry=False))
 collection = client.get_or_create_collection(name=COLLECTION_NAME)
 
-def search_docs(query, k=3):
+def search_docs(query, k=10):
     """Ищем похожие документы в ChromaDB"""
     results = collection.query(query_texts=[query], n_results=k)
     docs = results['documents'][0]
+
+    # убираем короткие сообщения
+    docs = [d for d in docs if len(d) > 100]
+
     return docs
 
 def ask_ollama(prompt, model="gemma3:12b"):
@@ -29,6 +33,12 @@ def ask_ollama(prompt, model="gemma3:12b"):
 def ask_with_rag(question):
     # получаем k похожих документов
     docs = search_docs(question)
+
+    print("\n--- НАЙДЕННЫЙ КОНТЕКСТ ---")
+    for d in docs:
+        print(d[:200])
+    print("--------------------------\n")
+
     context = "\n".join(f"- {d}" for d in docs)
 
     prompt = f"""
